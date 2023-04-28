@@ -1,5 +1,5 @@
 const moment = require("moment");
-const monitor = require("nodemon/lib/monitor");
+
 
 class IntervalTree {
   constructor() {
@@ -37,7 +37,6 @@ class IntervalTree {
             moment(end).isAfter(node.min)
           ) {
             console.log("overlapping");
-            console.log(start, end);
             break;
           } else if (moment(end).isSame(node.min)) {
             node.min = start;
@@ -61,33 +60,34 @@ class IntervalTree {
     }
 
     this.mergeIntervals();
+    
   }
 
-  mergeIntervals() {
-    const merged = [];
-    this._mergeIntervals(this.root, merged);
-    this.root = merged[0] || null;
-  }
+  // mergeIntervals() {
+  //   const merged = [];
+  //   this._mergeIntervals(this.root, merged);
+  //   this.root = merged[0] || null;
+  // }
 
-  _mergeIntervals(node, merged) {
-    if (!node) {
-      return;
-    }
+  // _mergeIntervals(node, merged) {
+  //   if (!node) {
+  //     return;
+  //   }
 
-    this._mergeIntervals(node.left, merged);
+  //   this._mergeIntervals(node.left, merged);
 
-    if (merged.length > 0) {
-      const last = merged[merged.length - 1];
-      if (moment(node.min).isSameOrBefore(moment(last.max))) {
-        last.max = moment.max(last.max, node.max);
-        return;
-      }
-    }
+  //   if (merged.length > 0) {
+  //     const last = merged[merged.length - 1];
+  //     if (moment(node.min).isSameOrBefore(moment(last.max))) {
+  //       last.max = moment.max(last.max, node.max);
+  //       return;
+  //     }
+  //   }
 
-    merged.push(new Node(moment(node.min), moment(node.max)));
+  //   merged.push(new Node(moment(node.min), moment(node.max)));
 
-    this._mergeIntervals(node.right, merged);
-  }
+  //   this._mergeIntervals(node.right, merged);
+  // }
 
   search(min, max) {
     let result = [];
@@ -136,7 +136,7 @@ class IntervalTree {
 
   deleteInterval(start1, end1) {
     this.root = this._deleteInterval(this.root, start1, end1);
-    console.log(this.root);
+    this.mergeIntervalss();
   }
 
   _deleteInterval(node, start1, end1) {
@@ -240,22 +240,54 @@ class IntervalTree {
     return node;
   }
 
-  updateInterval(start1, end1, start2, end2) {
-    const before = this.search(
-      moment(start1).subtract(5, "seconds").format("YYYY-MM-DD HH:mm:ss"),
-      moment(start1).subtract(1, "seconds").format("YYYY-MM-DD HH:mm:ss")
-    );
-    const after = this.search(
-      moment(end1).add(1, "seconds").format("YYYY-MM-DD HH:mm:ss"),
-      moment(end1).add(5, "seconds").format("YYYY-MM-DD HH:mm:ss")
-    );
-    console.log(before, after);
-    if (before.length == 0 && after.length == 0) {
-      this.deleteInterval([start1, end1]);
+  update(start1, end1, start2, end2) {
+    const overlap = this.search(end1, end2 - 1);
+    let overlap1
+    if(start1.isBefore(start2)){
+      overlap1=this.search(start1,start2).length
+    }
+
+    if(start2.isBefore(start1)){
+      overlap1=this.search(start2,start1).length
+    }
+
+
+    if (overlap.length == 0 &&overlap1==0 ) {
+      this.deleteInterval(start1, end1);
       this.insert([start2, end2]);
+      this.mergeIntervals();
+      this.mergeIntervalss()
     }
   }
 
+  mergeIntervalss() {
+    let stack = [];
+    let node = this.root;
+    let mergedIntervals = [];
+  
+    while (node !== null || stack.length > 0) {
+      if (node !== null) {
+        stack.push(node);
+        node = node.left;
+      } else {
+        node = stack.pop();
+        if (mergedIntervals.length > 0 && moment(node.min).isSameOrBefore(moment(mergedIntervals[mergedIntervals.length - 1][1]))) {
+          mergedIntervals[mergedIntervals.length - 1][1] = moment
+            .max([moment(node.max), moment(mergedIntervals[mergedIntervals.length - 1][1])])
+            .toDate();
+        } else {
+          mergedIntervals.push([node.min, node.max]);
+        }
+        node = node.right;
+      }
+    }
+  
+    this.root = null;
+    mergedIntervals.forEach(interval => {
+      this.insert(interval);
+    });
+  }
+  
   mergeIntervals() {
     let stack = [];
     let node = this.root;
@@ -332,20 +364,71 @@ class Node {
 
 // Create a new interval tree
 const tree = new IntervalTree();
-tree.insert([moment("11:00 am", "hh:mm a"), moment("12:00 pm", "hh:mm a")]);
-// console.log(
-//   tree.search(moment("09:30 am", "hh:mm a"), moment("11:01 am", "hh:mm a"))
-// );
-tree.insert([moment("09:30 am", "hh:mm a"), moment("11:00 am", "hh:mm a")]);
-
+tree.insert([moment("12:00 pm", "hh:mm a"), moment("01:00 pm", "hh:mm a")]);
+tree.insert([moment("02:00 pm", "hh:mm a"), moment("03:00 pm", "hh:mm a")]);
+tree.insert([moment("01:00 pm", "hh:mm a"), moment("02:00 pm", "hh:mm a")]);
+tree.insert([moment("03:00 pm", "hh:mm a"), moment("04:00 pm", "hh:mm a")]);
+tree.insert([moment("05:00 pm", "hh:mm a"), moment("06:00 pm", "hh:mm a")]);
 tree.deleteInterval(
-  moment("09:40 am", "hh:mm a"),
-  moment("11:30 am", "hh:mm a")
+  moment("05:00 pm", "hh:mm a"),
+  moment("06:00 pm", "hh:mm a")
+);
+tree.deleteInterval(
+  moment("02:00 pm", "hh:mm a"),
+  moment("03:00 pm", "hh:mm a")
 );
 
-// tree.insert([moment('01:00 pm', 'hh:mm a'), moment('03:00 pm', 'hh:mm a')]);
-// tree.insert([moment('04:00 pm', 'hh:mm a'), moment('05:00 pm', 'hh:mm a')]);
+tree.update(
+  moment("03:00 pm", "hh:mm a"),
+  moment("04:00 pm", "hh:mm a"),
+  moment("03:00 pm", "hh:mm a"),
+  moment("04:30 pm", "hh:mm a")
+);
+
+tree.update(
+  moment("01:00 pm", "hh:mm a"),
+  moment("02:00 pm", "hh:mm a"),
+  moment("01:00 pm", "hh:mm a"),
+  moment("02:30 pm", "hh:mm a")
+);
+
+tree.update(
+  moment("03:00 pm", "hh:mm a"),
+  moment("04:00 pm", "hh:mm a"),
+  moment("01:30 pm", "hh:mm a"),
+  moment("04:00 pm", "hh:mm a")
+);
+// tree.mergeIntervalss()
+// tree.insert([moment("02:30 pm", "hh:mm a"), moment("03:00 pm", "hh:mm a")]);
+// tree.mergeIntervalss()
+// // console.log(
+// //   tree.search(moment("09:30 am", "hh:mm a"), moment("11:01 am", "hh:mm a"))
+// // );
+// tree.insert([moment("09:30 am", "hh:mm a"), moment("11:00 am", "hh:mm a")]);
+// tree.insert([moment("08:00 am", "hh:mm a"), moment("09:30 am", "hh:mm a")]);
+// tree.insert([moment("01:00 pm", "hh:mm a"), moment("02:00 pm", "hh:mm a")]);
+
+// tree.deleteInterval(
+//   moment("09:40 am", "hh:mm a"),
+//   moment("11:30 am", "hh:mm a")
+// );
+// console.log(tree.getIntervals())
+
+// tree.deleteInterval(moment("01:00 pm", "hh:mm a"), moment("02:00 pm", "hh:mm a"));
+// tree.update(
+//   moment("08:30 am", "hh:mm a"),
+//   moment("09:40 am", "hh:mm a"),
+//   moment("08:30 am", "hh:mm a"),
+//   moment("10:30 am", "hh:mm a")
+// );
+
+// // tree.insert([moment('01:00 pm', 'hh:mm a'), moment('03:00 pm', 'hh:mm a')]);
+// // tree.insert([moment('04:00 pm', 'hh:mm a'), moment('05:00 pm', 'hh:mm a')]);
 
 console.log(tree.getIntervals());
-// tree.deleteInterval([moment('10:00 am', 'hh:mm a'), moment('11:00 am', 'hh:mm a')]);
+
+
+// tree.mergeIntervals();
+
+// tree.deleteInterval([moment('10:00 am', 'hh:mm  a'), moment('11:00 am', 'hh:mm a')]);
 // console.log(tree.getIntervals());
